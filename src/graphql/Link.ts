@@ -7,6 +7,7 @@ export const Link = objectType({
     t.nonNull.int("id");
     t.nonNull.string("description");
     t.nonNull.string("url");
+    t.nonNull.dateTime("createdAt");
     t.field("postedBy", {
       type: "User",
       resolve: (parent, _, context) => {
@@ -16,6 +17,12 @@ export const Link = objectType({
           })
           .postedBy();
       }
+    });
+    t.list.nonNull.field("voters", {
+      type: "User",
+      resolve: (parent, args, context) => {
+        return context.prisma.link.findUnique({ where: { id: parent.id } }).voters();
+      },
     });
   },
 });
