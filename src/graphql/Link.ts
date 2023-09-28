@@ -1,4 +1,5 @@
-import { extendType, objectType, nonNull, stringArg, idArg, nullable } from "nexus";
+import { extendType, objectType, nonNull, stringArg, idArg, nullable, intArg, inputObjectType, enumType, arg, list } from "nexus";
+import { Prisma } from "@prisma/client";
 import { NexusGenObjects } from "../../nexus-typegen";
 
 export const Link = objectType({
@@ -30,11 +31,36 @@ export const Link = objectType({
 export const LinkQuery = extendType({
   type: "Query",
   definition(t) {
-    t.nonNull.list.nonNull.field("feed", {
-      type: "Link",
-      resolve: (parent, args, context, info) => {
-        return context.prisma.link.findMany();
-      }
+    t.nonNull.field("feed", {
+      type: "Feed",
+      args: {
+        filter: stringArg(),
+        skip: intArg(),
+        take: intArg(),
+        orderBy: arg({ type: list(nonNull(LinkOrderByInput)) })
+      },
+      resolve: async (parent, args, context, info) => {
+        const where = args.filter ? {
+          OR: [
+            { description: { contains: args.filter } },
+            { url: { contains: args.filter } },
+          ],
+        } : {};
+        const links = await context.prisma.link.findMany({
+          where,
+          skip: args?.skip as number | undefined,
+          take: args?.take as number | undefined,
+          orderBy: args?.orderBy as Prisma.Enumerable<Prisma.LinkOrderByWithRelationInput> | undefined,
+        });
+        const count = await context.prisma.link.count({ where });
+        const id = `main-feed:${JSON.stringify(args)}`;
+
+        return {
+          count,
+          id,
+          links,
+        };
+      },
     })
     t.nullable.field("link", {
       type: "Link",
@@ -107,4 +133,27 @@ export const LinkMutation = extendType({
       }
     })
   },
+});
+
+export const LinkOrderByInput = inputObjectType({
+  name: "LinkOrderByInput",
+  definition(t) {
+    t.field("description", { type: Sort });
+    t.field("url", { type: Sort });
+    t.field("createdAt", { type: Sort });
+  }
+});
+
+export const Sort = enumType({
+  name: "Sort",
+  members: ["asc", "desc"]
+});
+
+export const Feed = objectType({
+  name: "Feed",
+  definition(t) {
+    t.nonNull.list.nonNull.field("links", { type: Link });
+    t.nonNull.int("count");
+    t.id("id")
+  }
 });
